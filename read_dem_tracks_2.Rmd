@@ -1,6 +1,6 @@
 ---
 title: "Tracks_latitude_vs_NAO.Rmd"
-author: "Peyer Thejll"
+author: "Peter Thejll"
 date: "01/04/2019"
 output: pdf_document
 ---
@@ -18,18 +18,25 @@ names <- paste0('*',str,'_track.dat')
 files <- list.files("OUTPUT/",pattern=names)
 ```
 
+Use bootstrapping (with replacement) to test robustness of the storm-track latitude vs NAO relationship. Go back to original ERAI and CFSR storm tracks and re-calculate median latitudes for track segments inside an 'North-Eastern Atlantic - North Sea' box.
+
+Note that data on storm tracks are available for 2001 only.
 
 ## Fetch the monthly NAO index so it can be interpolated in later
-# For now use the NOAA CDC PC-based NAO index 
+
 ```{r}
-NAO <- read.table("DATA/JD_NAO.dat")
+# Use either the NOAA CDC PC-based NAO index 
+# or the Hurrell index
+
+#NAO <- read.table("DATA/JD_NAO.dat")
+NAO <- read.table("DATA/JD_NAO_Hurrell.dat")
 colnames(NAO) <- c("NAO_JD","NAO_NAO")
 ```
 
 ## Do a bootstrap with replacement on the filenames
 
 ```{r}
-nMC <- 1000
+nMC <- 1000  # Number of Bootstraps to perform
 samp <-NULL
 allresults <- NULL
 for(i in 1:nMC){
@@ -51,13 +58,13 @@ for(i in 1:nMC){
     # Do the analysis for this member of the bootstrap sample
     # select the track points on basis of lon and lat in a box
     idx <- which(data$longitude > 350 & data$longitude < 360+10 & data$latitude > 25)
-    if (length(idx) > 5) {
+    if (length(idx) > 3) {
       #      print(paste(mean(data$NAO[idx]),mean(data$latitude[idx])))
       results <- rbind(results,c(mean(data$NAO[idx]),mean(data$latitude[idx])))
     }
     #print(paste(i,j,length(idx)))
   } # end j loop
-  # for this sample the table is built, now get NAO quantiles and then the medians of the lats over and under them
+  # for this sample the table is built, now get NAO quantiles and then the medians of the latitudes over and under them
   q <- quantile(results[,1])
   q25 <- q[2]
   idx <- which (results[,1] < q25)
