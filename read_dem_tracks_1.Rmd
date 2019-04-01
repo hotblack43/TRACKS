@@ -1,0 +1,78 @@
+---
+title: "Tracks_latitude_vs_NAO.Rmd"
+author: "Peyer Thejll"
+date: "01/04/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd('~/WORKSHOP/TRACKS/')
+```
+
+## Find the matching files
+```{r}
+str <- 'cfsr'
+names <- paste0('*',str,'_track.dat')
+files <- list.files("OUTPUT/",pattern=names)
+```
+
+
+## Fetch the NAO index so it can be interpolated in later
+```{r}
+NAO <- read.table("DATA/JD_NAO.dat")
+colnames(NAO) <- c("NAO_JD","NAO_NAO")
+```
+
+## Do a bootstrap with replacement on the filenames
+
+```{r}
+nMC <- 300
+samp <-NULL
+allresults <- NULL
+for(i in 1:nMC){
+  results <- NULL
+  samp <-sample(files, size = length(files), replace = T)
+  # Read the data from each file in the sample
+  for (j in 1:length(samp)){
+    
+    data <- as.data.frame(read.csv(paste0("OUTPUT/",samp[j]),header=F,sep=""))
+    data <- data[,-1]
+    colnames(data) <- c("JD","longitude","latitude","pressure")
+    # interpolate in te NAO table so that a column can be added to the df ...
+    NAO_interpolated <- approx(NAO$NAO_JD,NAO$NAO_NAO,data$JD)
+    data <- cbind(data,NAO_interpolated$y)
+    colnames(data) <- c("JD","longitude","latitude","pressure","NAO")
+# wrap around at longitude 359.9999 degress
+    idx <- which(data$longitude < 180)
+    if (length(idx) != 0L) {data$longitude[idx] <- data$longitude[idx]+360.0}
+# Do the analysis for this member of the bootstrap sample
+# selecte the track points on basis of lon and lat
+    idx <- which(data$longitude > 350 & data$longitude < 360+10 & data$latitude > 25)
+    if (length(idx) > 5) {
+#      print(paste(mean(data$NAO[idx]),mean(data$latitude[idx])))
+      results <- rbind(results,c(mean(data$NAO[idx]),mean(data$latitude[idx])))
+      }
+    #print(paste(i,j,length(idx)))
+  } # end j loop
+# for this sample the table is built, now get NAO quartiles and then the medians of the lats ovr and under them
+  q <- quantile(results[,1])
+  q25 <- q[2]
+  q75 <- q[4]
+  idx <- which (results[,1] < q25)
+  jdx <- which (results[,1] > q75)
+  # print the medians of the latitudes below and above those quantiles
+  lat_above_q75NAO <- median(results[jdx,2])
+  lat_below_q25NAO <- median(results[idx,2])
+  print(paste(lat_below_q25NAO,lat_above_q75NAO))
+  allresults <- rbind(allresults,c(lat_below_q25NAO,lat_above_q75NAO))
+  } # end i loop
+```
+
+## read each file and aggregate results
+```{r}
+plot(allresults[,1],allresults[,2],pch=20,xlab="Median lat for q25",ylab="Median lat for q75")
+```
+
+
+
